@@ -5,7 +5,6 @@ import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import lombok.Getter;
 import org.springframework.stereotype.Component;
 
-@Getter
 @Component
 public class UserAuditStatement {
     private final PreparedStatement insertStatement;
