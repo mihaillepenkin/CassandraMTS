@@ -60,7 +60,7 @@ public class UserAuditServiceTest {
     public void testCreateUser() {
         UserAudit user = new UserAudit(UUID.randomUUID(), Instant.now(), TypesOfEvent.CREATE);
         userAuditService.saveAudit(user);
-        List<Row> userAudit = userAuditService.findById(user.getId());
+        List<UserAudit> userAudit = userAuditService.findById(user.getId());
         Assertions.assertNotNull(user.getId());
         assertEquals(userAudit.size(), 1);
     }

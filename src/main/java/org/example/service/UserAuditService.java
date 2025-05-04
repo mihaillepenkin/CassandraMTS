@@ -1,7 +1,8 @@
 package org.example.service;
 
+import com.datastax.oss.driver.api.core.cql.PreparedStatement;
+import org.example.TypesOfEvent;
 import org.example.entity.UserAudit;
-import org.example.statement.UserAuditStatement;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.Row;
@@ -18,11 +19,12 @@ public class UserAuditService {
     @Autowired
     private CqlSession session;
 
-    @Autowired
-    private UserAuditStatement userAuditStatement;
-
     public void saveAudit(UserAudit userAudit) {
-        BoundStatement boundStatement = userAuditStatement.getInsertStatement().bind(
+        PreparedStatement insertStatement = session.prepare(
+                "INSERT INTO my_keyspace.user_audit (user_id, event_time, event_type) " +
+                        "VALUES (?, ?, ?)"
+        );
+        BoundStatement boundStatement = insertStatement.bind(
                 userAudit.getId(),
                 userAudit.getEventTime(),
                 userAudit.getEventType().name()
@@ -30,12 +32,18 @@ public class UserAuditService {
         session.execute(boundStatement);
     }
 
-    public List<Row> findById(UUID id) {
-        BoundStatement boundStatement = userAuditStatement.getSelectStatement().bind(id);
+    public List<UserAudit> findById(UUID id) {
+        PreparedStatement selectStatement = session.prepare(
+                "SELECT * FROM my_keyspace.user_audit WHERE user_id = ?"
+        );
+        BoundStatement boundStatement = selectStatement.bind(id);
         ResultSet resultSet = session.execute(boundStatement);
-        List<Row> events = new ArrayList<>();
+        List<UserAudit> events = new ArrayList<>();
         for (Row row : resultSet) {
-            events.add(row);
+            events.add(new UserAudit(
+                    row.getUuid("user_id"),
+                    row.getInstant("event_time"),
+                    (TypesOfEvent) row.getObject("event_type")));
         }
         return events;
     }
