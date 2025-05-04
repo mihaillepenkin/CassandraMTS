@@ -1,35 +1,41 @@
 package org.example.Service;
 
+
+
 import org.example.Application;
-import org.example.TypesOfEvent;
-import org.example.entity.UserAudit;
-import org.example.service.UserAuditService;
-import org.junit.jupiter.api.Assertions;
+import org.example.JacksonConfig;
+import org.example.service.KafkaConsumerService;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.CassandraContainer;
+import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
-@SpringBootTest(classes = Application.class)
+@Slf4j
 @Testcontainers
-public class UserAuditServiceTest {
+@SpringBootTest
+@Import(JacksonConfig.class)
+public class KafkaConsumerServiceTest {
 
-    @Autowired
-    public UserAuditService userAuditService;
+    @Container
+    public static KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.2.1"));
 
+    @DynamicPropertySource
+    static void kafkaProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.kafka.bootstrap-servers", kafka::getBootstrapServers);
+    }
     @Container
     private static final CassandraContainer<?> cassandraContainer =
             new CassandraContainer<>("cassandra:4.1.3")
@@ -50,24 +56,25 @@ public class UserAuditServiceTest {
         if (!cassandraContainer.isRunning()) {
             cassandraContainer.start();
         }
-        System.out.println("Cassandra port: " + cassandraContainer.getMappedPort(9042));
+        log.info("Cassandra port: " + cassandraContainer.getMappedPort(9042));
     }
+
+    @Autowired
+    private KafkaConsumerService kafkaConsumerService;
+
 
 
     @Test
-    public void testCreateUser() {
-        UserAudit user = new UserAudit(UUID.randomUUID(), Instant.now(), TypesOfEvent.CREATE);
-        userAuditService.saveAudit(user);
-        List<UserAudit> userAudit = userAuditService.findById(user.getId());
-        Assertions.assertNotNull(user.getId());
-        assertEquals(userAudit.size(), 1);
+    public void consumeMessage() {
+        String validMessage = "{\"id\":\"11111111-1111-1111-1111-111111111111\",\"eventTime\":\"2025-04-06T12:00:00Z\",\"eventType\":\"CREATE\",\"eventDetails\":\"Created user\"}";
+        kafkaConsumerService.listenAuditMessages(validMessage);
     }
 
     @Test
-    public void testGetUserById() {
-        UserAudit invalidUser = null;
-        assertThrows(RuntimeException.class, () -> {
-            userAuditService.saveAudit(invalidUser);
+    public void consumeInvalidMessage() {
+        String invalidMessage = null;
+        assertThrows(Exception.class, () -> {
+            kafkaConsumerService.listenAuditMessages(invalidMessage);
         });
     }
 }

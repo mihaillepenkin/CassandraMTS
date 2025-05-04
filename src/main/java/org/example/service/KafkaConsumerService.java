@@ -1,8 +1,9 @@
 package org.example.service;
 
 
+import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import org.example.entity.UserAudit;
-import org.example.statement.UserAuditStatement;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,13 +15,13 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 public class KafkaConsumerService {
-
-    private final UserAuditStatement userAuditStatement;
     private final ObjectMapper objectMapper;
 
     @Autowired
-    public KafkaConsumerService(UserAuditStatement userAuditStatement, ObjectMapper objectMapper) {
-        this.userAuditStatement = userAuditStatement;
+    private CqlSession session;
+
+    @Autowired
+    public KafkaConsumerService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
@@ -41,12 +42,16 @@ public class KafkaConsumerService {
 
     private void insertUserAudit(UserAudit userAudit) {
         try {
-            BoundStatement boundStatement = userAuditStatement.getInsertStatement().bind(
+            PreparedStatement insertStatement = session.prepare(
+                    "INSERT INTO my_keyspace.user_audit (user_id, event_time, event_type) " +
+                            "VALUES (?, ?, ?)"
+            );
+            BoundStatement boundStatement = insertStatement.bind(
                     userAudit.getId(),
                     userAudit.getEventTime(),
                     userAudit.getEventType().name()
             );
-            userAuditStatement.getSession().execute(boundStatement);
+            session.execute(boundStatement);
         } catch (Exception e) {
             log.error("Ошибка при вставке сообщения аудита", e);
         }
