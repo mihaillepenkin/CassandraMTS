@@ -10,8 +10,10 @@ import org.springframework.stereotype.Component;
 public class UserAuditStatement {
     private final PreparedStatement insertStatement;
     private final PreparedStatement selectStatement;
+    private final CqlSession session;
 
     public UserAuditStatement(CqlSession session) {
+        this.session = session;
         this.insertStatement = session.prepare(
                 "INSERT INTO my_keyspace.user_audit (user_id, event_time, event_type) " +
                         "VALUES (?, ?, ?)"
